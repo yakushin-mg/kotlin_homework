@@ -138,9 +138,9 @@ class ConsoleOutput {
                 
                 🌡️ Температурные показатели:
                 ├─ Минимум: ${ConsoleOutput.round(response.minTemp.value)}°C, дата: ${response.minTemp.date}
-                ├─ Максимум: ${ConsoleOutput.round(response.maxTemp.value)}°C, дата: ${response.minTemp.date}
+                ├─ Максимум: ${ConsoleOutput.round(response.maxTemp.value)}°C, дата: ${response.maxTemp.date}
                 ├─ Средняя: ${ConsoleOutput.round(response.avgTempValue)}°C
-                └─ Максимальный перепад: ${ConsoleOutput.round(response.maxTempDiff.value)}°C , дата: ${response.minTemp.date}
+                └─ Максимальный перепад: ${ConsoleOutput.round(response.maxTempDiff.value)}°C , дата: ${response.maxTempDiff.date}
                 
                 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
             """.trimIndent())
