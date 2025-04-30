@@ -48,7 +48,7 @@ data class WeatherResponse(
 class WeatherCache {
     private val cache = mutableListOf<WeatherResponse>()
 
-    fun addToCache(weatherData: WeatherResponse) {
+    fun add(weatherData: WeatherResponse) {
         cache.add(weatherData)
     }
 
@@ -61,7 +61,6 @@ class WeatherCache {
         }
     }
 }
-
 
 class ConsoleInput {
     companion object {
@@ -112,6 +111,8 @@ class ConsoleInput {
                         throw IllegalArgumentException("Слишком большой диапазон. Максимум 1 год (365 дней)")
                     }
 
+                    println("-".repeat(100))
+
                     return DatesRange(start, end)
                 } catch (e: Exception) {
                     println("Ошибка: ${e.message}")
@@ -124,19 +125,22 @@ class ConsoleInput {
 
 class ConsoleOutput {
     companion object {
+        private fun round(number: Double): Double {
+            return "%.2f".format(number).replace(",", ".").toDouble()
+        }
+
         fun printResponse(response: WeatherResponse) {
             println("""
-        
             🌤️ ПОГОДНЫЙ ОТЧЕТ 🌤️
                 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
                 📍 Локация: ${response.coordinates.latitude}°N, ${response.coordinates.longitude}°E
                 📅 Период: ${response.datesRange.start} — ${response.datesRange.end}
                 
                 🌡️ Температурные показатели:
-                ├─ Минимум: ${response.minTemp.value}°C
-                ├─ Максимум: ${response.maxTemp.value}°C
-                ├─ Средняя: ${"%.1f".format(response.avgTempValue)}°C
-                └─ Перепад: ${response.maxTempDiff.value}°C
+                ├─ Минимум: ${ConsoleOutput.round(response.minTemp.value)}°C, дата: ${response.minTemp.date}
+                ├─ Максимум: ${ConsoleOutput.round(response.maxTemp.value)}°C, дата: ${response.minTemp.date}
+                ├─ Средняя: ${ConsoleOutput.round(response.avgTempValue)}°C
+                └─ Максимальный перепад: ${ConsoleOutput.round(response.maxTempDiff.value)}°C , дата: ${response.minTemp.date}
                 
                 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
             """.trimIndent())
@@ -147,14 +151,14 @@ class ConsoleOutput {
 class WeatherApi {
     private val client = HttpClient.newHttpClient()
 
-    fun request(coords: Coordinates, dates_range: DatesRange): String {
+    fun request(coords: Coordinates, datesRange: DatesRange): String? {
 
         val url = "https://api.open-meteo.com/v1/forecast?" +
                 "latitude=${coords.latitude}&longitude=${coords.longitude}" +
                 "&daily=temperature_2m_max,temperature_2m_min" +
                 "&timezone=auto" +
-                "&start_date=${dates_range.start}" +
-                "&end_date=${dates_range.end}"
+                "&start_date=${datesRange.start}" +
+                "&end_date=${datesRange.end}"
         try {
             val request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -164,55 +168,62 @@ class WeatherApi {
             return response.body()
         } catch (e: Exception) {
             println("Ошибка: ${e.message}")
-            return "---"
+            return null
         }
     }
 
-    fun parsingJSON(json: String, coords: Coordinates, dates_range: DatesRange): WeatherResponse {
-        fun extractArray1(key: String): List<String> {
-            val regex = "\"$key\":\\s*\\[(.*?)\\]".toRegex()
-            val match = regex.find(json)?.groupValues?.get(1) ?: return emptyList()
-            return match.split(",").map { it.trim().removeSurrounding("\"") }
-        }
-
-        val dates = extractArray1("time")
-        val maxTemps = extractArray1("temperature_2m_max").map { it.toDoubleOrNull() }
-        val minTemps = extractArray1("temperature_2m_min").map { it.toDoubleOrNull() }
-
-        val minTempWithIndex = minTemps.withIndex()
-            .filter { it.value != null }
-            .minByOrNull { it.value!! }!!
-        val minTemp = minTempWithIndex.value!!
-        val minTempDate = dates[minTempWithIndex.index]
-
-        val maxTempWithIndex = maxTemps.withIndex()
-            .filter { it.value != null }
-            .maxByOrNull { it.value!! }!!
-        val maxTemp = maxTempWithIndex.value!!
-        val maxTempDate = dates[maxTempWithIndex.index]
-
-
-        val validTemps = maxTemps.zip(minTemps)
-            .filter { it.first != null && it.second != null }
-            .map { (it.first!! + it.second!!) / 2 }
-        val avgTemp = validTemps.average()
-
-
-        val tempDiffsWithIndices = maxTemps.zip(minTemps)
-            .mapIndexed { index, (max, min) ->
-                if (max != null && min != null) index to (max - min) else null
+    fun parsingJSON(json: String, coords: Coordinates, dates_range: DatesRange): WeatherResponse? {
+        try {
+            fun extractArray1(key: String): List<String> {
+                val regex = "\"$key\":\\s*\\[(.*?)\\]".toRegex()
+                val match = regex.find(json)?.groupValues?.get(1) ?: return emptyList()
+                return match.split(",").map { it.trim().removeSurrounding("\"") }
             }
-            .filterNotNull()
-        val maxDiffWithIndex = tempDiffsWithIndices.maxByOrNull { it.second }!!
-        val maxTempDiff = maxDiffWithIndex.second
-        val maxDiffDate = dates[maxDiffWithIndex.first]
 
-//        println("Минимальная температура: $minTemp°C, дата: $minTempDate")
-//        println("Максимальная температура: $maxTemp°C, дата: $maxTempDate")
-//        println("Средняя температура: ${"%.1f".format(avgTemp)}°C")
-//        println("Максимальная разница температур: $maxTempDiff°C, дата: $maxDiffDate")
+            val dates = extractArray1("time")
+            val maxTemps = extractArray1("temperature_2m_max").map { it.toDoubleOrNull() }
+            val minTemps = extractArray1("temperature_2m_min").map { it.toDoubleOrNull() }
 
-        return WeatherResponse(coords, dates_range, MinTemp(minTemp, LocalDate.parse(minTempDate)), MaxTemp(maxTemp, LocalDate.parse(maxTempDate)), MaxTempDiff(maxTempDiff, LocalDate.parse(maxDiffDate)), avgTemp)
+            val minTempWithIndex = minTemps.withIndex()
+                .filter { it.value != null }
+                .minByOrNull { it.value!! }!!
+            val minTemp = minTempWithIndex.value!!
+            val minTempDate = dates[minTempWithIndex.index]
+
+            val maxTempWithIndex = maxTemps.withIndex()
+                .filter { it.value != null }
+                .maxByOrNull { it.value!! }!!
+            val maxTemp = maxTempWithIndex.value!!
+            val maxTempDate = dates[maxTempWithIndex.index]
+
+
+            val validTemps = maxTemps.zip(minTemps)
+                .filter { it.first != null && it.second != null }
+                .map { (it.first!! + it.second!!) / 2 }
+            val avgTemp = validTemps.average()
+
+
+            val tempDiffsWithIndices = maxTemps.zip(minTemps)
+                .mapIndexed { index, (max, min) ->
+                    if (max != null && min != null) index to (max - min) else null
+                }
+                .filterNotNull()
+            val maxDiffWithIndex = tempDiffsWithIndices.maxByOrNull { it.second }!!
+            val maxTempDiff = maxDiffWithIndex.second
+            val maxDiffDate = dates[maxDiffWithIndex.first]
+
+            return WeatherResponse(
+                coords,
+                dates_range,
+                MinTemp(minTemp, LocalDate.parse(minTempDate)),
+                MaxTemp(maxTemp, LocalDate.parse(maxTempDate)),
+                MaxTempDiff(maxTempDiff, LocalDate.parse(maxDiffDate)),
+                avgTemp
+            )
+        } catch (e: Exception) {
+            println("Данные оказались невалидными, выберите другой промежуток")
+            return null
+        }
     }
 }
 
@@ -229,12 +240,16 @@ class WeatherApp {
             val dates_range = ConsoleInput.getDatesRange()
             var response = cache.find(coords, dates_range)
             if (response != null) {
+                println("Это уже сохранено в cache)")
                 ConsoleOutput.printResponse(response)
             } else {
                 val responseJson = weatherApi.request(coords, dates_range)
-                if (responseJson != "---") {
+                if (responseJson != null) {
                     response = weatherApi.parsingJSON(responseJson, coords, dates_range)
-                    ConsoleOutput.printResponse(response)
+                    if (response != null) {
+                        cache.add(response)
+                        ConsoleOutput.printResponse(response)
+                    }
                 }
             }
             print("\nВы хотите продолжить пользоваться приложением? (yes/no): ")
@@ -244,6 +259,6 @@ class WeatherApp {
             }
             println()
         }
-        println("Goodbye!")
+        println("Adios amigo!")
     }
 }
