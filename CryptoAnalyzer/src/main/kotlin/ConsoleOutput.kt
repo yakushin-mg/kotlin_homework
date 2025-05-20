@@ -3,9 +3,15 @@ class ConsoleOutput {
         println("▶️ Запуск анализа: ${settings.instrument} | Окно: ${settings.windowSeconds} сек | Метод: ${settings.method}")
     }
 
-    fun printProgress(current: Int, total: Int, price: Double, analysisResult: Double, method: String) {
-        val output = "${"%.2f".format(analysisResult)} ${progressBar(current, total)}"
-        println("[$current/$total] Цена: $price | Анализ: $output")
+    fun print(method: String, current: Int, total: Int, currentPrice: Double, analysisResult: Double) {
+        val formattedResult = "%.2f".format(analysisResult)
+        val bar = progressBar(current, total)
+
+        when (method) {
+            "Средняя цена" -> println("[$current/$total] Цена: $currentPrice | Средняя: $formattedResult $bar")
+            "Линейная экстраполяция" -> println("[$current/$total] Цена: $currentPrice | Экстраполяция: $formattedResult $bar")
+            else -> println("[$current/$total] Цена: $currentPrice | Анализ: $formattedResult $bar")
+        }
     }
 
     fun printError(current: Int, total: Int) {

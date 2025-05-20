@@ -28,9 +28,10 @@ class CryptoApp {
                     history.add(PricePoint(now, price))
                     val result = when (settings.method) {
                         "Средняя цена" -> analyzer.average(history)
-                        else -> analyzer.linearExtrapolation(history)
+                        "Линейная экстраполяция" -> analyzer.linearExtrapolation(history)
+                        else -> 0.0
                     }
-                    outputHandler.printProgress(i, settings.windowSeconds, price, result, settings.method)
+                    outputHandler.print(settings.method, i, settings.windowSeconds, price, result)
                 } else {
                     outputHandler.printError(i, settings.windowSeconds)
                 }
