@@ -1,14 +1,10 @@
 class ConsoleOutput {
-
     fun printStartInfo(settings: UserSettings) {
         println("▶️ Запуск анализа: ${settings.instrument} | Окно: ${settings.windowSeconds} сек | Метод: ${settings.method}")
     }
 
     fun printProgress(current: Int, total: Int, price: Double, analysisResult: Double, method: String) {
-        val output = when (method) {
-            "average" -> "${"%.2f".format(analysisResult)} ${progressBar(current, total)}"
-            else -> "%.2f".format(analysisResult)
-        }
+        val output = "${"%.2f".format(analysisResult)} ${progressBar(current, total)}"
         println("[$current/$total] Цена: $price | Анализ: $output")
     }
 
